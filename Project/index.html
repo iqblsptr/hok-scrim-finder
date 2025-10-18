@@ -1,0 +1,146 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Honor of Kings Scrim Finder</title>
+    <link rel="stylesheet" href="styles.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <!-- Navigation -->
+    <nav class="navbar">
+        <div class="nav-container">
+            <div class="nav-brand">
+                <i class="fas fa-trophy"></i>
+                <h1>HOK Scrim</h1>
+            </div>
+            
+            <div class="nav-right">
+                <button class="btn-lang" id="langBtn">
+                    <i class="fas fa-globe"></i>
+                    <span id="langText">EN</span>
+                </button>
+                
+                <div id="authButtons" class="auth-buttons" style="display: flex; gap: 10px;">
+                    <button class="btn-notification" id="notifBtn" style="display: none;">
+                        <i class="fas fa-bell"></i>
+                        <span class="notif-badge" id="notifBadge" style="display: none;">0</span>
+                    </button>
+                    <button class="btn-logout" id="logoutBtn" style="display: none;">
+                        <span id="logoutText">Keluar</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- Hero Section -->
+    <section id="heroSection" class="hero">
+        <div class="hero-container">
+            <h1 id="heroTitle">Honor of Kings Scrim Finder</h1>
+            <p id="heroSubtitle">Temukan Lawan Scrim Terbaik</p>
+            <button class="btn-register" id="registerBtn" onclick="openModal('register')">
+                <span id="registerText">Daftar Tim</span>
+            </button>
+        </div>
+        <div class="decorative-circle circle-1"></div>
+        <div class="decorative-circle circle-2"></div>
+    </section>
+
+    <!-- Main Content -->
+    <div id="mainContent" class="main-content" style="display: none;">
+        <div class="container">
+            <!-- Tab Navigation -->
+            <div class="tab-navigation">
+                <button class="tab-btn active" onclick="switchTab('findMatch')" id="findMatchTab">
+                    <i class="fas fa-search"></i>
+                    <span id="findMatchText">Cari Lawan</span>
+                </button>
+                <button class="tab-btn" onclick="switchTab('myTeam')" id="myTeamTab">
+                    <i class="fas fa-users"></i>
+                    <span id="myTeamText">Tim Saya</span>
+                </button>
+                <button class="tab-btn" onclick="switchTab('notifications')" id="notificationsTab">
+                    <i class="fas fa-upload"></i>
+                    <span id="uploadResultsText">Upload Hasil</span>
+                </button>
+            </div>
+
+            <!-- Find Match Page -->
+            <div id="findMatchPage" class="page-content active">
+                <div class="search-controls">
+                    <div class="search-row">
+                        <div class="search-field">
+                            <label id="countryLabel">Negara</label>
+                            <select id="countryFilter" onchange="updateProvinces()">
+                                <option value="">Semua Negara</option>
+                                <option value="Indonesia">Indonesia</option>
+                                <option value="Malaysia">Malaysia</option>
+                                <option value="Philippines">Filipina</option>
+                            </select>
+                        </div>
+                        
+                        <div class="search-field">
+                            <label id="provinceLabel">Provinsi</label>
+                            <select id="provinceFilter" disabled>
+                                <option value="">Pilih Provinsi</option>
+                            </select>
+                        </div>
+                        
+                        <div class="search-field">
+                            <button class="btn-search" id="searchBtn" onclick="handleSearchMatch()">
+                                <i class="fas fa-search"></i>
+                                <span id="searchText">Mencari Lawan</span>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div id="searchingIndicator" class="searching-indicator" style="display: none;">
+                        <i class="fas fa-hourglass-half"></i>
+                        <span id="searchingText">Sedang Mencari...</span>
+                    </div>
+                </div>
+
+                <!-- Teams List -->
+                <div id="teamsList" class="teams-list"></div>
+            </div>
+
+            <!-- My Team Page -->
+            <div id="myTeamPage" class="page-content" style="display: none;">
+                <div class="team-info-card">
+                    <h2 id="teamInfoTitle">Informasi Tim</h2>
+                    <div id="teamInfoContent" class="team-info-content"></div>
+                </div>
+            </div>
+
+            <!-- Notifications Page -->
+            <div id="notificationsPage" class="page-content" style="display: none;">
+                <div class="notifications-container">
+                    <h2 id="notificationsTitle">Notifikasi</h2>
+                    <div id="notificationsList" class="notifications-list"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal -->
+    <div id="modal" class="modal" style="display: none;">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h2 id="modalTitle">Daftar Tim</h2>
+                <button class="btn-close" onclick="closeModal()">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            
+            <div class="modal-body" id="modalBody"></div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="translations.js"></script>
+    <script src="data.js"></script>
+    <script src="script.js"></script>
+</body>
+</html>

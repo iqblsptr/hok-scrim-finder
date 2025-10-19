@@ -135,6 +135,13 @@ function getLoginFormHTML() {
             <div class="auth-form-toggle" style="border-top: none; padding-top: 0;">
                 <a href="#" style="color: #fcd34d; font-size: 0.875rem; text-decoration: none;">${t.forgotPassword}</a>
             </div>
+            <button type="submit" class="btn-submit">${t.login}</button>
+            
+            <div class="auth-form-toggle" style="border-top: none; padding-top: 0;">
+                <a href="#" onclick="handleForgotPassword(event)" style="color: #fcd34d; font-size: 0.875rem; text-decoration: none;">${t.forgotPassword}</a>
+            </div>
+            
+            <div class="auth-form-toggle">
             
             <div class="auth-form-toggle">
                 <p>${t.dontHaveAccount}</p>
@@ -756,4 +763,15 @@ function renderNotifications() {
             <div class="notification-contact">WhatsApp: ${notif.whatsapp} | Email: ${notif.email}</div>
         </div>
     `).join('');
+}
+//handle lupa kata sandi
+function handleForgotPassword(e) {
+    e.preventDefault(); // Menghentikan tautan agar tidak reload halaman
+    const t = translations[lang];
+    
+    const message = lang === 'id' 
+        ? "Fitur reset kata sandi otomatis tidak tersedia. Silakan hubungi admin kami melalui email: support@hokscrim.com"
+        : "Automatic password reset is unavailable. Please contact our admin via email: support@hokscrim.com";
+        
+    alert(message);
 }

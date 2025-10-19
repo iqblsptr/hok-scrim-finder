@@ -40,9 +40,15 @@
         <div class="hero-container">
             <h1 id="heroTitle">Honor of Kings Scrim Finder</h1>
             <p id="heroSubtitle">Temukan Lawan Scrim Terbaik</p>
-            <button class="btn-register" id="registerBtn" onclick="openModal('register')">
-                <span id="registerText">Daftar Tim</span>
-            </button>
+            
+            <div class="hero-buttons">
+                <button class="btn-register" id="loginBtn" onclick="openModal('login')">
+                    <span id="loginText">Masuk</span>
+                </button>
+                <button class="btn-register btn-register-alt" id="registerBtnHero" onclick="openModal('register')">
+                    <span id="registerText">Daftar Tim</span>
+                </button>
+            </div>
         </div>
         <div class="decorative-circle circle-1"></div>
         <div class="decorative-circle circle-2"></div>
@@ -140,7 +146,6 @@
 
     <!-- Scripts -->
     <script src="./data.js"></script>
-    <script src="./translations.js"></script>
     <script src="./script.js"></script>
 </body>
 </html>

@@ -10,12 +10,15 @@ let expandedTeam = null;
 document.addEventListener('DOMContentLoaded', () => {
     setupEventListeners();
     updateLanguage();
+    
+    // Load teams from localStorage
+    const savedTeams = JSON.parse(localStorage.getItem('hokTeams')) || [];
+    teams = savedTeams;
 });
 
 // Event Listeners
 function setupEventListeners() {
     document.getElementById('langBtn').addEventListener('click', toggleLanguage);
-    document.getElementById('registerBtn').addEventListener('click', () => openModal('register'));
     document.getElementById('notifBtn').addEventListener('click', () => switchTab('notifications'));
     document.getElementById('logoutBtn').addEventListener('click', logout);
 }
@@ -32,6 +35,7 @@ function updateLanguage() {
     document.getElementById('langText').textContent = lang === 'id' ? 'EN' : 'ID';
     document.getElementById('heroTitle').textContent = t.title;
     document.getElementById('heroSubtitle').textContent = t.tagline;
+    document.getElementById('loginText').textContent = t.login;
     document.getElementById('registerText').textContent = t.register;
     document.getElementById('findMatchText').textContent = t.findMatch;
     document.getElementById('myTeamText').textContent = t.myTeam;
@@ -61,10 +65,6 @@ function switchTab(tabName) {
     
     document.getElementById(pageId).classList.add('active');
     document.getElementById(tabName + 'Tab').classList.add('active');
-    
-    if (tabName === 'notifications') {
-        document.getElementById('notificationsTab').textContent = t.notifications;
-    }
 }
 
 // Modal Functions
@@ -74,16 +74,27 @@ function openModal(type) {
     const modalBody = document.getElementById('modalBody');
     const t = translations[lang];
     
-    if (type === 'register') {
+    if (type === 'login') {
+        modalTitle.textContent = t.login;
+        modalBody.innerHTML = getLoginFormHTML();
+        
+        document.getElementById('loginForm').addEventListener('submit', handleLogin);
+        document.getElementById('toggleToRegister').addEventListener('click', () => {
+            openModal('register');
+        });
+    } else if (type === 'register') {
         modalTitle.textContent = t.register;
         modalBody.innerHTML = getRegisterFormHTML();
         
-        // Setup form event listeners
         const countrySelect = document.getElementById('modalCountry');
         const provinceSelect = document.getElementById('modalProvince');
         countrySelect.addEventListener('change', () => updateModalProvinces());
         document.getElementById('logoUpload').addEventListener('change', handleLogoUpload);
         document.getElementById('registerForm').addEventListener('submit', handleRegister);
+        
+        document.getElementById('toggleToLogin').addEventListener('click', () => {
+            openModal('login');
+        });
     } else if (type === 'uploadResults') {
         modalTitle.textContent = t.uploadResults;
         modalBody.innerHTML = getUploadResultsFormHTML();
@@ -102,6 +113,71 @@ window.addEventListener('click', (e) => {
     const modal = document.getElementById('modal');
     if (e.target === modal) closeModal();
 });
+
+// Login Form HTML
+function getLoginFormHTML() {
+    const t = translations[lang];
+    
+    return `
+        <form id="loginForm" class="form-group" style="display: flex; flex-direction: column; gap: 1rem;">
+            <div class="form-group">
+                <label>${t.email}</label>
+                <input type="email" id="loginEmail" required placeholder="nama@email.com">
+            </div>
+            
+            <div class="form-group">
+                <label>${t.password}</label>
+                <input type="password" id="loginPassword" required placeholder="${t.password}">
+            </div>
+            
+            <button type="submit" class="btn-submit">${t.login}</button>
+            
+            <div class="auth-form-toggle">
+                <p>${t.dontHaveAccount}</p>
+                <button type="button" id="toggleToRegister">${t.registerNow}</button>
+            </div>
+        </form>
+    `;
+}
+
+// Handle Login
+function handleLogin(e) {
+    e.preventDefault();
+    const t = translations[lang];
+    
+    const email = document.getElementById('loginEmail').value;
+    const password = document.getElementById('loginPassword').value;
+    
+    // Ambil data tim dari localStorage
+    const allTeams = JSON.parse(localStorage.getItem('hokTeams')) || [];
+    
+    // Cari team dengan email dan password yang cocok
+    const team = allTeams.find(t => t.email === email && t.password === password);
+    
+    if (!team) {
+        alert(t.invalidCredentials);
+        return;
+    }
+    
+    // Set current user
+    currentUser = team;
+    isLoggedIn = true;
+    teams = allTeams;
+    
+    // Update UI
+    document.getElementById('heroSection').style.display = 'none';
+    document.getElementById('mainContent').style.display = 'block';
+    document.getElementById('registerBtnHero').style.display = 'none';
+    document.getElementById('loginBtn').style.display = 'none';
+    document.getElementById('notifBtn').style.display = 'block';
+    document.getElementById('logoutBtn').style.display = 'block';
+    
+    closeModal();
+    renderTeams();
+    switchTab('findMatch');
+    
+    alert(`${t.welcome} ${team.teamName}!`);
+}
 
 // Register Form HTML
 function getRegisterFormHTML() {
@@ -153,10 +229,25 @@ function getRegisterFormHTML() {
             
             <div class="form-group">
                 <label>${t.email}</label>
-                <input type="email" id="email" required>
+                <input type="email" id="email" required placeholder="nama@email.com">
+            </div>
+            
+            <div class="form-group">
+                <label>${t.password}</label>
+                <input type="password" id="password" required placeholder="Minimal 6 karakter">
+            </div>
+            
+            <div class="form-group">
+                <label>${t.confirmPassword}</label>
+                <input type="password" id="confirmPassword" required placeholder="Ulangi kata sandi">
             </div>
             
             <button type="submit" class="btn-submit">${t.submit}</button>
+            
+            <div class="auth-form-toggle">
+                <p>${t.alreadyHaveAccount}</p>
+                <button type="button" id="toggleToLogin">${t.loginNow}</button>
+            </div>
         </form>
     `;
 }
@@ -214,6 +305,20 @@ function handleRegister(e) {
     e.preventDefault();
     const t = translations[lang];
     
+    const password = document.getElementById('password').value;
+    const confirmPassword = document.getElementById('confirmPassword').value;
+    
+    // Validasi password
+    if (password.length < 6) {
+        alert(t.passwordTooShort);
+        return;
+    }
+    
+    if (password !== confirmPassword) {
+        alert(t.passwordMismatch);
+        return;
+    }
+    
     const country = document.getElementById('modalCountry').value;
     const whatsapp = document.getElementById('whatsapp').value;
     
@@ -233,27 +338,43 @@ function handleRegister(e) {
     }
     
     const fullWhatsapp = pattern.prefix + whatsapp;
+    const email = document.getElementById('email').value;
+    
+    // Cek email sudah terdaftar
+    const allTeams = JSON.parse(localStorage.getItem('hokTeams')) || [];
+    if (allTeams.find(t => t.email === email)) {
+        alert(t.emailAlreadyExists);
+        return;
+    }
     
     const newTeam = {
         id: Date.now(),
         teamName: document.getElementById('teamName').value,
         captainName: document.getElementById('captainName').value,
         whatsapp: fullWhatsapp,
-        email: document.getElementById('email').value,
+        email: email,
+        password: password,
         country: country,
         province: document.getElementById('modalProvince').value,
         logo: logoPreviewData,
-        status: 'available'
+        status: 'available',
+        createdAt: new Date().toISOString()
     };
     
-    teams.push(newTeam);
+    // Simpan ke localStorage
+    allTeams.push(newTeam);
+    localStorage.setItem('hokTeams', JSON.stringify(allTeams));
+    
+    // Set current user
     currentUser = newTeam;
     isLoggedIn = true;
+    teams = allTeams;
     
     // Update UI
     document.getElementById('heroSection').style.display = 'none';
     document.getElementById('mainContent').style.display = 'block';
-    document.getElementById('registerBtn').style.display = 'none';
+    document.getElementById('registerBtnHero').style.display = 'none';
+    document.getElementById('loginBtn').style.display = 'none';
     document.getElementById('notifBtn').style.display = 'block';
     document.getElementById('logoutBtn').style.display = 'block';
     
@@ -261,7 +382,7 @@ function handleRegister(e) {
     renderTeams();
     switchTab('findMatch');
     
-    alert(lang === 'id' ? 'Tim berhasil didaftar!' : 'Team registered successfully!');
+    alert(t.registerSuccess);
     logoPreviewData = null;
 }
 
@@ -269,13 +390,13 @@ function handleRegister(e) {
 function logout() {
     isLoggedIn = false;
     currentUser = null;
-    teams = [];
     notifications = [];
     expandedTeam = null;
     
     document.getElementById('heroSection').style.display = 'block';
     document.getElementById('mainContent').style.display = 'none';
-    document.getElementById('registerBtn').style.display = 'block';
+    document.getElementById('registerBtnHero').style.display = 'block';
+    document.getElementById('loginBtn').style.display = 'block';
     document.getElementById('notifBtn').style.display = 'none';
     document.getElementById('logoutBtn').style.display = 'none';
     document.getElementById('notifBadge').style.display = 'none';
@@ -613,6 +734,8 @@ function handleUploadResults(e) {
     closeModal();
     screenshotPreviewData = null;
 }
+
+
 
 // Render Notifications
 function renderNotifications() {

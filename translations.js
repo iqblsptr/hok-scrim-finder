@@ -1,4 +1,3 @@
-// ===== TRANSLATIONS.JS =====
 const translations = {
   id: {
     title: 'Honor of Kings Scrim Finder',
@@ -39,8 +38,19 @@ const translations = {
     yourScore: 'Skor Anda',
     opponentScore: 'Skor Lawan',
     uploadScreenshot: 'Upload Screenshot',
-    teamsFrom: 'Tim dari'
+    teamsFrom: 'Tim dari',
+    login: 'Masuk',
+    password: 'Kata Sandi',
+    confirmPassword: 'Konfirmasi Kata Sandi',
+    emailAlreadyExists: 'Email sudah terdaftar',
+    passwordMismatch: 'Password tidak cocok',
+    passwordTooShort: 'Password minimal 6 karakter',
+    invalidCredentials: 'Email atau password salah',
+    welcome: 'Selamat datang',
+    registerSuccess: 'Tim berhasil didaftar',
+    loginSuccess: 'Berhasil masuk'
   },
+
   en: {
     title: 'Honor of Kings Scrim Finder',
     tagline: 'Find the Best Scrim Opponents',
@@ -80,6 +90,16 @@ const translations = {
     yourScore: 'Your Score',
     opponentScore: 'Opponent Score',
     uploadScreenshot: 'Upload Screenshot',
-    teamsFrom: 'Teams from'
+    teamsFrom: 'Teams from',
+    login: 'Login',
+    password: 'Password',
+    confirmPassword: 'Confirm Password',
+    emailAlreadyExists: 'Email already registered',
+    passwordMismatch: 'Passwords do not match',
+    passwordTooShort: 'Password must be at least 6 characters',
+    invalidCredentials: 'Email or password incorrect',
+    welcome: 'Welcome',
+    registerSuccess: 'Team registered successfully',
+    loginSuccess: 'Login successful'
   }
 };

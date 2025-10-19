@@ -1,4 +1,3 @@
-// ===== DATA.JS =====
 const regions = {
   Indonesia: [
     'DKI Jakarta', 'Jawa Barat', 'Jawa Tengah', 'Jawa Timur', 'Banten',
@@ -17,28 +16,22 @@ const regions = {
   ]
 };
 
-const phonePrefix = {
-  'Indonesia': '+62',
-  'Malaysia': '+60',
-  'Philippines': '+63'
-};
-
 const phonePatterns = {
   'Indonesia': {
     prefix: '+62',
-    pattern: /^[0-9]{9,12}$/, // 9-12 digit
+    pattern: /^[0-9]{9,12}$/,
     example: '8123456789 atau 081234567890',
     placeholder: '8123456789'
   },
   'Malaysia': {
     prefix: '+60',
-    pattern: /^[0-9]{9,10}$/, // 9-10 digit
+    pattern: /^[0-9]{9,10}$/,
     example: '123456789 atau 1234567890',
     placeholder: '123456789'
   },
   'Philippines': {
     prefix: '+63',
-    pattern: /^[0-9]{10}$/, // 10 digit
+    pattern: /^[0-9]{10}$/,
     example: '9123456789',
     placeholder: '9123456789'
   }

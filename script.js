@@ -145,42 +145,58 @@ function getLoginFormHTML() {
     `;
 }
 // Handle Login
-function handleLogin(e) {
+// Handle Login (Diubah ke Async untuk Fetch API)
+async function handleLogin(e) {
     e.preventDefault();
     const t = translations[lang];
     
     const email = document.getElementById('loginEmail').value;
     const password = document.getElementById('loginPassword').value;
-    
-    // Ambil data tim dari localStorage
-    const allTeams = JSON.parse(localStorage.getItem('hokTeams')) || [];
-    
-    // Cari team dengan email dan password yang cocok
-    const team = allTeams.find(t => t.email === email && t.password === password);
-    
-    if (!team) {
-        alert(t.invalidCredentials);
-        return;
+
+    try {
+        // 1. Kirim kredensial ke API Vercel untuk verifikasi
+        const response = await fetch('/api/login', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({ email, password }),
+        });
+
+        const result = await response.json();
+
+        if (response.ok) {
+            // 2. Jika login sukses, ambil semua data yang diperlukan dari respons
+            const loggedInTeam = result.team;
+            const allTeamsData = result.allTeams; // ASUMSI API MENGEMBALIKAN SEMUA TIM
+
+            // --- SET STATE BARU DARI DATABASE ---
+            currentUser = loggedInTeam;
+            isLoggedIn = true;
+            teams = allTeamsData; // Variabel global 'teams' diisi dari database
+            
+            // 3. Update UI (Sama seperti sebelumnya, tapi sekarang datanya valid)
+            document.getElementById('heroSection').style.display = 'none';
+            document.getElementById('mainContent').style.display = 'block';
+            document.getElementById('registerBtnHero').style.display = 'none';
+            document.getElementById('loginBtn').style.display = 'none';
+            document.getElementById('notifBtn').style.display = 'block';
+            document.getElementById('logoutBtn').style.display = 'block';
+            
+            closeModal();
+            renderTeams(); // Render menggunakan data 'teams' dari database
+            renderTeamInfo(); // Tampilkan info tim yang baru login
+            switchTab('findMatch');
+            
+            alert(`${t.welcome} ${loggedInTeam.teamName}!`);
+            
+        } else {
+            alert(result.message || t.invalidCredentials);
+        }
+    } catch (error) {
+        console.error('Login Fetch Error:', error);
+        alert(t.invalidCredentials); // Gunakan pesan error umum
     }
-    
-    // Set current user
-    currentUser = team;
-    isLoggedIn = true;
-    teams = allTeams;
-    
-    // Update UI
-    document.getElementById('heroSection').style.display = 'none';
-    document.getElementById('mainContent').style.display = 'block';
-    document.getElementById('registerBtnHero').style.display = 'none';
-    document.getElementById('loginBtn').style.display = 'none';
-    document.getElementById('notifBtn').style.display = 'block';
-    document.getElementById('logoutBtn').style.display = 'block';
-    
-    closeModal();
-    renderTeams();
-    switchTab('findMatch');
-    
-    alert(`${t.welcome} ${team.teamName}!`);
 }
 
 // Register Form HTML

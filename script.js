@@ -422,21 +422,6 @@ async function handleRegister(e) {
         alert(lang === 'id' ? 'Gagal terhubung ke server. Periksa koneksi Anda.' : 'Failed to connect to the server. Check your connection.');
     }
   
-    
-    // Update UI
-    document.getElementById('heroSection').style.display = 'none';
-    document.getElementById('mainContent').style.display = 'block';
-    document.getElementById('registerBtnHero').style.display = 'none';
-    document.getElementById('loginBtn').style.display = 'none';
-    document.getElementById('notifBtn').style.display = 'block';
-    document.getElementById('logoutBtn').style.display = 'block';
-    
-    closeModal();
-    renderTeams();
-    switchTab('findMatch');
-    
-    alert(t.registerSuccess);
-    logoPreviewData = null;
 }
 
 // Logout

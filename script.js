@@ -82,6 +82,7 @@ function openModal(type) {
         document.getElementById('toggleToRegister').addEventListener('click', () => {
             openModal('register');
         });
+        document.getElementById('forgotPasswordLink').addEventListener('click', handleForgotPassword);
     } else if (type === 'register') {
         modalTitle.textContent = t.register;
         modalBody.innerHTML = getRegisterFormHTML();
@@ -116,7 +117,7 @@ window.addEventListener('click', (e) => {
 
 // Login Form HTML
 function getLoginFormHTML() {
-    const t = translations[lang]; // Ambil terjemahan yang sudah diperbarui
+    const t = translations[lang];
     
     return `
         <form id="loginForm" class="form-group" style="display: flex; flex-direction: column; gap: 1rem;">
@@ -133,15 +134,8 @@ function getLoginFormHTML() {
             <button type="submit" class="btn-submit">${t.login}</button>
             
             <div class="auth-form-toggle" style="border-top: none; padding-top: 0;">
-                <a href="#" style="color: #fcd34d; font-size: 0.875rem; text-decoration: none;">${t.forgotPassword}</a>
+                <a href="#" id="forgotPasswordLink" style="color: #fcd34d; font-size: 0.875rem; text-decoration: none;">${t.forgotPassword}</a>
             </div>
-            <button type="submit" class="btn-submit">${t.login}</button>
-            
-            <div class="auth-form-toggle" style="border-top: none; padding-top: 0;">
-                <a href="#" onclick="handleForgotPassword(event)" style="color: #fcd34d; font-size: 0.875rem; text-decoration: none;">${t.forgotPassword}</a>
-            </div>
-            
-            <div class="auth-form-toggle">
             
             <div class="auth-form-toggle">
                 <p>${t.dontHaveAccount}</p>

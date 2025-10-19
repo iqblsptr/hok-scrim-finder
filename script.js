@@ -404,17 +404,7 @@ async function handleRegister(e) {
     } catch (error) {
         console.error('Fetch Error:', error);
         alert(lang === 'id' ? 'Gagal terhubung ke server. Periksa koneksi Anda.' : 'Failed to connect to the server. Check your connection.');
-    } finally {
-        isSubmitting = false;
-        logoBase64Data = null; // Reset data base64
     }
-
-    
-
-    
-    // Set current user
-    currentUser = newTeam;
-    isLoggedIn = true;
   
     
     // Update UI

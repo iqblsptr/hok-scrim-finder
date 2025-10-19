@@ -288,50 +288,51 @@ function updateModalProvinces() {
 }
 
 // Handle Logo Upload
-let logoPreviewData = null;
+let logoBase64Data = null; // Menyimpan data base64 gambar untuk dikirim ke API
+let isSubmitting = false; // Status untuk mencegah submit ganda
 function handleLogoUpload(e) {
     const file = e.target.files[0];
     if (file && file.size <= 10 * 1024 * 1024) {
         const reader = new FileReader();
         reader.onloadend = () => {
-            logoPreviewData = reader.result;
+            logoBase64Data = reader.result; // Simpan data base64
             document.getElementById('logoPreview').src = reader.result;
             document.getElementById('logoPreview').style.display = 'block';
         };
         reader.readAsDataURL(file);
     } else {
         alert(lang === 'id' ? 'Ukuran file maksimal 10MB' : 'Maximum file size is 10MB');
+        logoBase64Data = null; // Reset jika tidak valid
     }
 }
 
-// Handle Register
-function handleRegister(e) {
+// Handle Register (Diubah ke Async untuk Fetch API)
+async function handleRegister(e) {
     e.preventDefault();
     const t = translations[lang];
+
+    if (isSubmitting) return; // Mencegah submit ganda
     
     const password = document.getElementById('password').value;
     const confirmPassword = document.getElementById('confirmPassword').value;
     
-    // Validasi password
+    // --- VALIDASI (Tetap di Frontend) ---
     if (password.length < 6) {
         alert(t.passwordTooShort);
         return;
     }
-    
     if (password !== confirmPassword) {
         alert(t.passwordMismatch);
         return;
     }
-    
     const country = document.getElementById('modalCountry').value;
     const whatsapp = document.getElementById('whatsapp').value;
     
-    // Validate phone format
+    // Validasi format telepon (menggunakan fungsi global dan data.js)
     if (!country || !phonePatterns[country]) {
         alert(lang === 'id' ? 'Pilih negara terlebih dahulu' : 'Please select a country');
         return;
     }
-    
     const pattern = phonePatterns[country];
     if (!pattern.pattern.test(whatsapp)) {
         alert(lang === 'id' 
@@ -340,39 +341,81 @@ function handleRegister(e) {
         );
         return;
     }
-    
     const fullWhatsapp = pattern.prefix + whatsapp;
     const email = document.getElementById('email').value;
     
-    // Cek email sudah terdaftar
-    const allTeams = JSON.parse(localStorage.getItem('hokTeams')) || [];
-    if (allTeams.find(t => t.email === email)) {
-        alert(t.emailAlreadyExists);
-        return;
-    }
+    // --- PENGIRIMAN DATA KE API ---
+    isSubmitting = true;
     
-    const newTeam = {
-        id: Date.now(),
+    const registrationData = {
         teamName: document.getElementById('teamName').value,
         captainName: document.getElementById('captainName').value,
         whatsapp: fullWhatsapp,
         email: email,
-        password: password,
+        password: password, // Akan di-hash di sisi server
         country: country,
         province: document.getElementById('modalProvince').value,
-        logo: logoPreviewData,
+        logoBase64: logoBase64Data, // Data gambar yang dikirim
         status: 'available',
-        createdAt: new Date().toISOString()
     };
     
-    // Simpan ke localStorage
-    allTeams.push(newTeam);
-    localStorage.setItem('hokTeams', JSON.stringify(allTeams));
+    try {
+        // Ganti '/api/register' dengan endpoint API Vercel Anda yang sebenarnya
+        const response = await fetch('/api/register', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(registrationData),
+        });
+
+        const result = await response.json();
+
+        if (response.ok) {
+            // ASUMSI API MENGEMBALIKAN DATA TIM TERBARU (TERMASUK logo_url)
+            const newTeam = result.team; 
+            
+            // --- UPDATE STATE UI (Berdasarkan Respon Database) ---
+            currentUser = newTeam;
+            isLoggedIn = true;
+            // Di aplikasi nyata, Anda akan meminta semua tim baru dari API
+            
+            // Hapus kode localStorage lama di sini
+            
+            // Update UI
+            document.getElementById('heroSection').style.display = 'none';
+            document.getElementById('mainContent').style.display = 'block';
+            document.getElementById('registerBtnHero').style.display = 'none';
+            document.getElementById('loginBtn').style.display = 'none';
+            document.getElementById('notifBtn').style.display = 'block';
+            document.getElementById('logoutBtn').style.display = 'block';
+            
+            closeModal();
+            // Anda perlu membuat fungsi API yang mengembalikan semua tim, lalu panggil renderTeams()
+            // renderTeams(); 
+            switchTab('findMatch');
+            
+            alert(t.registerSuccess);
+            
+        } else {
+            // Tangani error dari server (misalnya, email sudah terdaftar)
+            alert(result.message || (lang === 'id' ? 'Pendaftaran gagal.' : 'Registration failed.'));
+        }
+    } catch (error) {
+        console.error('Fetch Error:', error);
+        alert(lang === 'id' ? 'Gagal terhubung ke server. Periksa koneksi Anda.' : 'Failed to connect to the server. Check your connection.');
+    } finally {
+        isSubmitting = false;
+        logoBase64Data = null; // Reset data base64
+    }
+
+    
+
     
     // Set current user
     currentUser = newTeam;
     isLoggedIn = true;
-    teams = allTeams;
+  
     
     // Update UI
     document.getElementById('heroSection').style.display = 'none';

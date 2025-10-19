@@ -116,7 +116,7 @@ window.addEventListener('click', (e) => {
 
 // Login Form HTML
 function getLoginFormHTML() {
-    const t = translations[lang];
+    const t = translations[lang]; // Ambil terjemahan yang sudah diperbarui
     
     return `
         <form id="loginForm" class="form-group" style="display: flex; flex-direction: column; gap: 1rem;">
@@ -132,6 +132,10 @@ function getLoginFormHTML() {
             
             <button type="submit" class="btn-submit">${t.login}</button>
             
+            <div class="auth-form-toggle" style="border-top: none; padding-top: 0;">
+                <a href="#" style="color: #fcd34d; font-size: 0.875rem; text-decoration: none;">${t.forgotPassword}</a>
+            </div>
+            
             <div class="auth-form-toggle">
                 <p>${t.dontHaveAccount}</p>
                 <button type="button" id="toggleToRegister">${t.registerNow}</button>
@@ -139,7 +143,6 @@ function getLoginFormHTML() {
         </form>
     `;
 }
-
 // Handle Login
 function handleLogin(e) {
     e.preventDefault();

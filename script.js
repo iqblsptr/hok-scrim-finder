@@ -11,9 +11,8 @@ document.addEventListener('DOMContentLoaded', () => {
     setupEventListeners();
     updateLanguage();
     
-    // Load teams from localStorage
-    const savedTeams = JSON.parse(localStorage.getItem('hokTeams')) || [];
-    teams = savedTeams;
+    // Check if user is logged in (using session/cookie in production)
+    // For now, teams will be loaded after login
 });
 
 // Event Listeners
@@ -144,8 +143,8 @@ function getLoginFormHTML() {
         </form>
     `;
 }
-// Handle Login
-// Handle Login (Diubah ke Async untuk Fetch API)
+
+// Handle Login - FIXED VERSION
 async function handleLogin(e) {
     e.preventDefault();
     const t = translations[lang];
@@ -153,8 +152,13 @@ async function handleLogin(e) {
     const email = document.getElementById('loginEmail').value;
     const password = document.getElementById('loginPassword').value;
 
+    // Show loading state
+    const submitBtn = e.target.querySelector('button[type="submit"]');
+    const originalText = submitBtn.textContent;
+    submitBtn.textContent = lang === 'id' ? 'Memproses...' : 'Processing...';
+    submitBtn.disabled = true;
+
     try {
-        // 1. Kirim kredensial ke API Vercel untuk verifikasi
         const response = await fetch('/api/login', {
             method: 'POST',
             headers: {
@@ -165,17 +169,15 @@ async function handleLogin(e) {
 
         const result = await response.json();
 
-        if (response.ok) {
-            // 2. Jika login sukses, ambil semua data yang diperlukan dari respons
-            const loggedInTeam = result.team;
-            const allTeamsData = result.allTeams; // ASUMSI API MENGEMBALIKAN SEMUA TIM
-
-            // --- SET STATE BARU DARI DATABASE ---
-            currentUser = loggedInTeam;
+        if (response.ok && result.team) {
+            // Set logged in user
+            currentUser = result.team;
             isLoggedIn = true;
-            teams = allTeamsData; // Variabel global 'teams' diisi dari database
             
-            // 3. Update UI (Sama seperti sebelumnya, tapi sekarang datanya valid)
+            // Set teams list from API response
+            teams = result.allTeams || [];
+            
+            // Update UI
             document.getElementById('heroSection').style.display = 'none';
             document.getElementById('mainContent').style.display = 'block';
             document.getElementById('registerBtnHero').style.display = 'none';
@@ -184,18 +186,21 @@ async function handleLogin(e) {
             document.getElementById('logoutBtn').style.display = 'block';
             
             closeModal();
-            renderTeams(); // Render menggunakan data 'teams' dari database
-            renderTeamInfo(); // Tampilkan info tim yang baru login
+            renderTeams();
+            renderTeamInfo();
             switchTab('findMatch');
             
-            alert(`${t.welcome} ${loggedInTeam.teamName}!`);
+            alert(`${t.welcome} ${currentUser.teamName}!`);
             
         } else {
             alert(result.message || t.invalidCredentials);
         }
     } catch (error) {
-        console.error('Login Fetch Error:', error);
-        alert(t.invalidCredentials); // Gunakan pesan error umum
+        console.error('Login Error:', error);
+        alert(lang === 'id' ? 'Gagal terhubung ke server' : 'Failed to connect to server');
+    } finally {
+        submitBtn.textContent = originalText;
+        submitBtn.disabled = false;
     }
 }
 
@@ -304,35 +309,33 @@ function updateModalProvinces() {
 }
 
 // Handle Logo Upload
-let logoBase64Data = null; // Menyimpan data base64 gambar untuk dikirim ke API
-let isSubmitting = false; // Status untuk mencegah submit ganda
+let logoBase64Data = null;
+
 function handleLogoUpload(e) {
     const file = e.target.files[0];
     if (file && file.size <= 10 * 1024 * 1024) {
         const reader = new FileReader();
         reader.onloadend = () => {
-            logoBase64Data = reader.result; // Simpan data base64
+            logoBase64Data = reader.result;
             document.getElementById('logoPreview').src = reader.result;
             document.getElementById('logoPreview').style.display = 'block';
         };
         reader.readAsDataURL(file);
     } else {
         alert(lang === 'id' ? 'Ukuran file maksimal 10MB' : 'Maximum file size is 10MB');
-        logoBase64Data = null; // Reset jika tidak valid
+        logoBase64Data = null;
     }
 }
 
-// Handle Register (Diubah ke Async untuk Fetch API)
+// Handle Register - FIXED VERSION
 async function handleRegister(e) {
     e.preventDefault();
     const t = translations[lang];
-
-    if (isSubmitting) return; // Mencegah submit ganda
     
     const password = document.getElementById('password').value;
     const confirmPassword = document.getElementById('confirmPassword').value;
     
-    // --- VALIDASI (Tetap di Frontend) ---
+    // Validations
     if (password.length < 6) {
         alert(t.passwordTooShort);
         return;
@@ -341,14 +344,15 @@ async function handleRegister(e) {
         alert(t.passwordMismatch);
         return;
     }
+    
     const country = document.getElementById('modalCountry').value;
     const whatsapp = document.getElementById('whatsapp').value;
     
-    // Validasi format telepon (menggunakan fungsi global dan data.js)
     if (!country || !phonePatterns[country]) {
         alert(lang === 'id' ? 'Pilih negara terlebih dahulu' : 'Please select a country');
         return;
     }
+    
     const pattern = phonePatterns[country];
     if (!pattern.pattern.test(whatsapp)) {
         alert(lang === 'id' 
@@ -357,26 +361,29 @@ async function handleRegister(e) {
         );
         return;
     }
+    
     const fullWhatsapp = pattern.prefix + whatsapp;
     const email = document.getElementById('email').value;
     
-    // --- PENGIRIMAN DATA KE API ---
-    isSubmitting = true;
+    // Show loading state
+    const submitBtn = e.target.querySelector('button[type="submit"]');
+    const originalText = submitBtn.textContent;
+    submitBtn.textContent = lang === 'id' ? 'Mendaftar...' : 'Registering...';
+    submitBtn.disabled = true;
     
     const registrationData = {
         teamName: document.getElementById('teamName').value,
         captainName: document.getElementById('captainName').value,
         whatsapp: fullWhatsapp,
         email: email,
-        password: password, // Akan di-hash di sisi server
+        password: password,
         country: country,
         province: document.getElementById('modalProvince').value,
-        logoBase64: logoBase64Data, // Data gambar yang dikirim
+        logoBase64: logoBase64Data,
         status: 'available',
     };
     
     try {
-        // Ganti '/api/register' dengan endpoint API Vercel Anda yang sebenarnya
         const response = await fetch('/api/register', {
             method: 'POST',
             headers: {
@@ -387,47 +394,30 @@ async function handleRegister(e) {
 
         const result = await response.json();
 
-        if (response.ok) {
-            // ASUMSI API MENGEMBALIKAN DATA TIM TERBARU (TERMASUK logo_url)
-            const newTeam = result.team; 
-            
-            // --- UPDATE STATE UI (Berdasarkan Respon Database) ---
-            currentUser = newTeam;
-            isLoggedIn = true;
-            // Di aplikasi nyata, Anda akan meminta semua tim baru dari API
-            
-            // Hapus kode localStorage lama di sini
-            
-            // Update UI
-            document.getElementById('heroSection').style.display = 'none';
-            document.getElementById('mainContent').style.display = 'block';
-            document.getElementById('registerBtnHero').style.display = 'none';
-            document.getElementById('loginBtn').style.display = 'none';
-            document.getElementById('notifBtn').style.display = 'block';
-            document.getElementById('logoutBtn').style.display = 'block';
-            
-            closeModal();
-            // Anda perlu membuat fungsi API yang mengembalikan semua tim, lalu panggil renderTeams()
-            // renderTeams(); 
-            switchTab('findMatch');
-            
-            alert(t.registerSuccess);
-            
+        if (response.ok && result.team) {
+            alert(t.registerSuccess + ' ' + (lang === 'id' ? 'Silakan login' : 'Please login'));
+            openModal('login');
         } else {
-            // Tangani error dari server (misalnya, email sudah terdaftar)
-            alert(result.message || (lang === 'id' ? 'Pendaftaran gagal.' : 'Registration failed.'));
+            if (result.code === 'emailAlreadyExists') {
+                alert(t.emailAlreadyExists);
+            } else {
+                alert(result.message || (lang === 'id' ? 'Pendaftaran gagal.' : 'Registration failed.'));
+            }
         }
     } catch (error) {
-        console.error('Fetch Error:', error);
-        alert(lang === 'id' ? 'Gagal terhubung ke server. Periksa koneksi Anda.' : 'Failed to connect to the server. Check your connection.');
+        console.error('Registration Error:', error);
+        alert(lang === 'id' ? 'Gagal terhubung ke server. Periksa koneksi Anda.' : 'Failed to connect to server. Check your connection.');
+    } finally {
+        submitBtn.textContent = originalText;
+        submitBtn.disabled = false;
     }
-  
 }
 
 // Logout
 function logout() {
     isLoggedIn = false;
     currentUser = null;
+    teams = [];
     notifications = [];
     expandedTeam = null;
     
@@ -773,8 +763,6 @@ function handleUploadResults(e) {
     screenshotPreviewData = null;
 }
 
-
-
 // Render Notifications
 function renderNotifications() {
     const notifsList = document.getElementById('notificationsList');
@@ -792,9 +780,10 @@ function renderNotifications() {
         </div>
     `).join('');
 }
-//handle lupa kata sandi
+
+// Handle Forgot Password
 function handleForgotPassword(e) {
-    e.preventDefault(); // Menghentikan tautan agar tidak reload halaman
+    e.preventDefault();
     const t = translations[lang];
     
     const message = lang === 'id' 

@@ -11,6 +11,10 @@ export default async function handler(req, res) {
     try {
         const { email, password } = req.body;
 
+        if (!email || !password) {
+            return res.status(400).json({ message: 'Email dan password wajib diisi.' });
+        }
+
         // 1. Ambil Hash Password dan Data Tim dari Database
         const userResult = await sql`
             SELECT id, email, password_hash, team_name, logo_url, country, province, status, captain_name, whatsapp 
@@ -37,18 +41,34 @@ export default async function handler(req, res) {
             FROM teams;
         `;
 
-        // Hapus password hash sebelum mengirim data ke frontend
-        delete team.password_hash; 
+        // 4. Convert snake_case ke camelCase untuk frontend
+        const convertTeam = (dbTeam) => ({
+            id: dbTeam.id,
+            teamName: dbTeam.team_name,
+            logo: dbTeam.logo_url,
+            country: dbTeam.country,
+            province: dbTeam.province,
+            status: dbTeam.status,
+            captainName: dbTeam.captain_name,
+            whatsapp: dbTeam.whatsapp,
+            email: dbTeam.email
+        });
 
-        // 4. Kirim Respons Sukses
+        const loggedInTeam = convertTeam(team);
+        const allTeams = allTeamsResult.rows.map(convertTeam);
+
+        // 5. Kirim Respons Sukses
         return res.status(200).json({ 
             message: 'Login berhasil.', 
-            team: team,
-            allTeams: allTeamsResult.rows
+            team: loggedInTeam,
+            allTeams: allTeams
         });
 
     } catch (error) {
         console.error('Login API Error:', error);
-        return res.status(500).json({ message: 'Kesalahan internal server.', error: error.message });
+        return res.status(500).json({ 
+            message: 'Kesalahan internal server.', 
+            error: error.message 
+        });
     }
 }

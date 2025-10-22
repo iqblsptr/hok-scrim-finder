@@ -6,20 +6,241 @@ let teams = [];
 let notifications = [];
 let expandedTeam = null;
 
+// Session Storage Keys
+const SESSION_KEY = 'hok_session';
+const NOTIF_KEY = 'hok_notifications';
+
 // Initialize App
 document.addEventListener('DOMContentLoaded', () => {
     setupEventListeners();
+    restoreSession(); // Restore session on page load
     updateLanguage();
-    
-    // Check if user is logged in (using session/cookie in production)
-    // For now, teams will be loaded after login
 });
+
+// Restore Session from localStorage
+function restoreSession() {
+    console.log('Restoring session...');
+    const sessionData = localStorage.getItem(SESSION_KEY);
+    const notifData = localStorage.getItem(NOTIF_KEY);
+    
+    if (sessionData) {
+        try {
+            const session = JSON.parse(sessionData);
+            console.log('Session found:', session);
+            
+            currentUser = session.currentUser;
+            teams = session.teams || [];
+            isLoggedIn = true;
+            
+            // Show logged in UI
+            showLoggedInUI();
+            renderTeams();
+            renderTeamInfo();
+            updateUserProfile();
+            
+            console.log('Session restored successfully');
+        } catch (error) {
+            console.error('Error restoring session:', error);
+            clearSession();
+        }
+    }
+    
+    if (notifData) {
+        try {
+            notifications = JSON.parse(notifData);
+            updateNotificationBadge();
+            console.log('Notifications restored:', notifications.length);
+        } catch (error) {
+            console.error('Error restoring notifications:', error);
+        }
+    }
+}
+
+// Save Session to localStorage
+function saveSession() {
+    if (isLoggedIn && currentUser) {
+        const sessionData = {
+            currentUser,
+            teams,
+            timestamp: Date.now()
+        };
+        localStorage.setItem(SESSION_KEY, JSON.stringify(sessionData));
+        console.log('Session saved');
+    }
+}
+
+// Clear Session
+function clearSession() {
+    localStorage.removeItem(SESSION_KEY);
+    localStorage.removeItem(NOTIF_KEY);
+    console.log('Session cleared');
+}
+
+// Save Notifications
+function saveNotifications() {
+    localStorage.setItem(NOTIF_KEY, JSON.stringify(notifications));
+}
+
+// Show Logged In UI
+function showLoggedInUI() {
+    document.getElementById('heroSection').style.display = 'none';
+    document.getElementById('mainContent').style.display = 'block';
+    document.getElementById('registerBtnHero').style.display = 'none';
+    document.getElementById('loginBtn').style.display = 'none';
+    document.querySelector('.notification-wrapper').style.display = 'block';
+    document.getElementById('logoutBtn').style.display = 'block';
+    document.getElementById('userProfile').style.display = 'flex';
+}
+
+// Update User Profile in Navbar
+function updateUserProfile() {
+    if (!currentUser) return;
+    
+    const userName = document.getElementById('userName');
+    const userAvatar = document.getElementById('userAvatar');
+    const userStatus = document.getElementById('userStatus');
+    
+    userName.textContent = currentUser.teamName || '-';
+    
+    if (currentUser.logo) {
+        userAvatar.src = currentUser.logo;
+        userAvatar.style.display = 'block';
+    } else {
+        // Use default avatar with team initial
+        userAvatar.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(currentUser.teamName || 'T')}&background=eab308&color=1f2937&size=128`;
+    }
+    
+    // Update status color
+    const statusText = getStatusText(currentUser.status || 'available');
+    userStatus.textContent = statusText;
+    
+    // Update status dot color
+    const statusDot = userStatus.querySelector('::before');
+    if (currentUser.status === 'searching') {
+        userStatus.style.setProperty('--status-color', '#facc15');
+    } else if (currentUser.status === 'inMatch') {
+        userStatus.style.setProperty('--status-color', '#f87171');
+    } else {
+        userStatus.style.setProperty('--status-color', '#4ade80');
+    }
+}
 
 // Event Listeners
 function setupEventListeners() {
     document.getElementById('langBtn').addEventListener('click', toggleLanguage);
-    document.getElementById('notifBtn').addEventListener('click', () => switchTab('notifications'));
+    document.getElementById('notifBtn').addEventListener('click', toggleNotificationDropdown);
+    document.getElementById('btnReadAll').addEventListener('click', markAllNotificationsRead);
     document.getElementById('logoutBtn').addEventListener('click', logout);
+    
+    // Close notification dropdown when clicking outside
+    document.addEventListener('click', (e) => {
+        const notifWrapper = document.querySelector('.notification-wrapper');
+        const notifDropdown = document.getElementById('notificationDropdown');
+        
+        if (notifWrapper && !notifWrapper.contains(e.target)) {
+            notifDropdown.style.display = 'none';
+        }
+    });
+}
+
+// Toggle Notification Dropdown
+function toggleNotificationDropdown(e) {
+    e.stopPropagation();
+    const dropdown = document.getElementById('notificationDropdown');
+    const isVisible = dropdown.style.display === 'block';
+    
+    dropdown.style.display = isVisible ? 'none' : 'block';
+    
+    if (!isVisible) {
+        renderNotificationDropdown();
+    }
+}
+
+// Render Notification Dropdown
+function renderNotificationDropdown() {
+    const list = document.getElementById('notificationDropdownList');
+    const t = translations[lang];
+    
+    if (notifications.length === 0) {
+        list.innerHTML = `
+            <div class="notification-empty">
+                <i class="fas fa-bell-slash"></i>
+                <p>${t.noNotifText || 'Tidak ada notifikasi'}</p>
+            </div>
+        `;
+        return;
+    }
+    
+    list.innerHTML = notifications.map((notif, index) => `
+        <div class="notification-item-dropdown ${notif.read ? '' : 'unread'}" onclick="markNotificationRead(${index})">
+            <div class="notification-item-header">
+                <div class="notification-item-title">
+                    <i class="fas fa-users"></i> ${notif.title || 'Tawaran Scrim'}
+                </div>
+                <div class="notification-item-time">${notif.time}</div>
+            </div>
+            <div class="notification-item-message">${notif.message}</div>
+            <div class="notification-item-contact">
+                <span><i class="fas fa-phone"></i> ${notif.whatsapp}</span>
+                <span><i class="fas fa-envelope"></i> ${notif.email}</span>
+            </div>
+        </div>
+    `).join('');
+}
+
+// Mark Notification as Read
+function markNotificationRead(index) {
+    if (notifications[index]) {
+        notifications[index].read = true;
+        updateNotificationBadge();
+        renderNotificationDropdown();
+        saveNotifications();
+    }
+}
+
+// Mark All Notifications as Read
+function markAllNotificationsRead() {
+    notifications.forEach(notif => notif.read = true);
+    updateNotificationBadge();
+    renderNotificationDropdown();
+    saveNotifications();
+}
+
+// Add Notification
+function addNotification(title, message, whatsapp, email) {
+    const notification = {
+        id: Date.now(),
+        title: title,
+        message: message,
+        whatsapp: whatsapp,
+        email: email,
+        time: new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }),
+        timestamp: new Date().toISOString(),
+        read: false
+    };
+    
+    notifications.unshift(notification); // Add to beginning
+    
+    // Keep only last 50 notifications
+    if (notifications.length > 50) {
+        notifications = notifications.slice(0, 50);
+    }
+    
+    updateNotificationBadge();
+    saveNotifications();
+}
+
+// Update Notification Badge
+function updateNotificationBadge() {
+    const badge = document.getElementById('notifBadge');
+    const unreadCount = notifications.filter(n => !n.read).length;
+    
+    if (unreadCount > 0) {
+        badge.textContent = unreadCount > 99 ? '99+' : unreadCount;
+        badge.style.display = 'flex';
+    } else {
+        badge.style.display = 'none';
+    }
 }
 
 // Language Toggle
@@ -46,11 +267,20 @@ function updateLanguage() {
     document.getElementById('teamInfoTitle').textContent = t.teamInfo;
     document.getElementById('notificationsTitle').textContent = t.notifications;
     document.getElementById('logoutText').textContent = t.logout;
+    document.getElementById('notifHeaderText').textContent = t.notifications;
+    document.getElementById('readAllText').textContent = lang === 'id' ? 'Tandai Semua Dibaca' : 'Mark All Read';
+    document.getElementById('noNotifText').textContent = lang === 'id' ? 'Tidak ada notifikasi' : 'No notifications';
     
     updateProvinces();
-    renderTeams();
-    if (currentUser) renderTeamInfo();
-    if (notifications.length > 0) renderNotifications();
+    if (isLoggedIn) {
+        renderTeams();
+        renderTeamInfo();
+        updateUserProfile();
+    }
+    if (notifications.length > 0) {
+        renderNotifications();
+        renderNotificationDropdown();
+    }
 }
 
 // Tab Navigation
@@ -58,12 +288,15 @@ function switchTab(tabName) {
     document.querySelectorAll('.page-content').forEach(el => el.classList.remove('active'));
     document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
     
-    const t = translations[lang];
     const pageId = tabName === 'notifications' ? 'notificationsPage' : 
                    tabName === 'myTeam' ? 'myTeamPage' : 'findMatchPage';
     
     document.getElementById(pageId).classList.add('active');
     document.getElementById(tabName + 'Tab').classList.add('active');
+    
+    if (tabName === 'myTeam' && currentUser) {
+        renderTeamInfo();
+    }
 }
 
 // Modal Functions
@@ -87,7 +320,6 @@ function openModal(type) {
         modalBody.innerHTML = getRegisterFormHTML();
         
         const countrySelect = document.getElementById('modalCountry');
-        const provinceSelect = document.getElementById('modalProvince');
         countrySelect.addEventListener('change', () => updateModalProvinces());
         document.getElementById('logoUpload').addEventListener('change', handleLogoUpload);
         document.getElementById('registerForm').addEventListener('submit', handleRegister);
@@ -144,7 +376,7 @@ function getLoginFormHTML() {
     `;
 }
 
-// Handle Login - FIXED VERSION
+// Handle Login
 async function handleLogin(e) {
     e.preventDefault();
     const t = translations[lang];
@@ -152,7 +384,6 @@ async function handleLogin(e) {
     const email = document.getElementById('loginEmail').value;
     const password = document.getElementById('loginPassword').value;
 
-    // Show loading state
     const submitBtn = e.target.querySelector('button[type="submit"]');
     const originalText = submitBtn.textContent;
     submitBtn.textContent = lang === 'id' ? 'Memproses...' : 'Processing...';
@@ -170,20 +401,27 @@ async function handleLogin(e) {
         const result = await response.json();
 
         if (response.ok && result.team) {
-            // Set logged in user
-            currentUser = result.team;
-            isLoggedIn = true;
+            currentUser = {
+                id: result.team.id,
+                teamName: result.team.teamName,
+                logo: result.team.logo,
+                country: result.team.country,
+                province: result.team.province,
+                status: result.team.status || 'available',
+                captainName: result.team.captainName,
+                whatsapp: result.team.whatsapp,
+                email: result.team.email
+            };
             
-            // Set teams list from API response
+            isLoggedIn = true;
             teams = result.allTeams || [];
             
-            // Update UI
-            document.getElementById('heroSection').style.display = 'none';
-            document.getElementById('mainContent').style.display = 'block';
-            document.getElementById('registerBtnHero').style.display = 'none';
-            document.getElementById('loginBtn').style.display = 'none';
-            document.getElementById('notifBtn').style.display = 'block';
-            document.getElementById('logoutBtn').style.display = 'block';
+            // Save session
+            saveSession();
+            
+            // Show UI
+            showLoggedInUI();
+            updateUserProfile();
             
             closeModal();
             renderTeams();
@@ -298,7 +536,6 @@ function updateModalProvinces() {
         });
     }
     
-    // Update phone input
     if (country && phonePatterns[country]) {
         const pattern = phonePatterns[country];
         phonePrefixEl.textContent = pattern.prefix;
@@ -327,7 +564,7 @@ function handleLogoUpload(e) {
     }
 }
 
-// Handle Register - FIXED VERSION
+// Handle Register
 async function handleRegister(e) {
     e.preventDefault();
     const t = translations[lang];
@@ -335,7 +572,6 @@ async function handleRegister(e) {
     const password = document.getElementById('password').value;
     const confirmPassword = document.getElementById('confirmPassword').value;
     
-    // Validations
     if (password.length < 6) {
         alert(t.passwordTooShort);
         return;
@@ -365,7 +601,6 @@ async function handleRegister(e) {
     const fullWhatsapp = pattern.prefix + whatsapp;
     const email = document.getElementById('email').value;
     
-    // Show loading state
     const submitBtn = e.target.querySelector('button[type="submit"]');
     const originalText = submitBtn.textContent;
     submitBtn.textContent = lang === 'id' ? 'Mendaftar...' : 'Registering...';
@@ -406,7 +641,7 @@ async function handleRegister(e) {
         }
     } catch (error) {
         console.error('Registration Error:', error);
-        alert(lang === 'id' ? 'Gagal terhubung ke server. Periksa koneksi Anda.' : 'Failed to connect to server. Check your connection.');
+        alert(lang === 'id' ? 'Gagal terhubung ke server' : 'Failed to connect to server');
     } finally {
         submitBtn.textContent = originalText;
         submitBtn.disabled = false;
@@ -415,19 +650,27 @@ async function handleRegister(e) {
 
 // Logout
 function logout() {
+    const confirmLogout = confirm(lang === 'id' ? 'Yakin ingin keluar?' : 'Are you sure you want to logout?');
+    
+    if (!confirmLogout) return;
+    
     isLoggedIn = false;
     currentUser = null;
     teams = [];
     notifications = [];
     expandedTeam = null;
     
+    // Clear session
+    clearSession();
+    
     document.getElementById('heroSection').style.display = 'block';
     document.getElementById('mainContent').style.display = 'none';
     document.getElementById('registerBtnHero').style.display = 'block';
     document.getElementById('loginBtn').style.display = 'block';
-    document.getElementById('notifBtn').style.display = 'none';
+    document.querySelector('.notification-wrapper').style.display = 'none';
     document.getElementById('logoutBtn').style.display = 'none';
     document.getElementById('notifBadge').style.display = 'none';
+    document.getElementById('userProfile').style.display = 'none';
 }
 
 // Update Provinces Filter
@@ -525,7 +768,7 @@ function renderTeamCard(team) {
         <div class="team-card" data-team-id="${team.id}">
             <div class="team-header">
                 <div class="team-header-left">
-                    ${team.logo ? `<img src="${team.logo}" class="team-logo">` : '<div class="team-logo" style="background: #374151;"></div>'}
+                    ${team.logo ? `<img src="${team.logo}" class="team-logo" alt="${team.teamName}">` : '<div class="team-logo" style="background: #374151;"></div>'}
                     <div class="team-header-info">
                         <div class="team-name">${team.teamName}</div>
                         <div class="team-province">${team.province}</div>
@@ -595,58 +838,41 @@ function handleSearchMatch() {
         document.getElementById('searchBtn').innerHTML = `<i class="fas fa-times"></i><span>${t.cancelSearch}</span>`;
         document.getElementById('searchingIndicator').style.display = 'flex';
         
+        // Simulate finding a match after 3 seconds
         setTimeout(() => {
-            const notification = {
-                id: Date.now(),
-                message: lang === 'id' ? 'Ada tim yang tertarik untuk scrim dengan Anda!' : 'A team is interested in scrimming with you!',
-                whatsapp: currentUser.whatsapp,
-                email: currentUser.email,
-                timestamp: new Date().toLocaleString()
-            };
-            notifications.push(notification);
-            updateNotificationBadge();
+            const title = lang === 'id' ? 'Tim Tertarik' : 'Team Interested';
+            const message = lang === 'id' ? 'Ada tim yang tertarik untuk scrim dengan Anda!' : 'A team is interested in scrimming with you!';
+            
+            addNotification(title, message, currentUser.whatsapp, currentUser.email);
+            
             alert(lang === 'id' 
                 ? `Notifikasi dikirim ke WhatsApp (${currentUser.whatsapp}) dan Email (${currentUser.email})`
                 : `Notification sent to WhatsApp (${currentUser.whatsapp}) and Email (${currentUser.email})`
             );
-        }, 2000);
+        }, 3000);
     }
-    renderTeams();
+    
+    // Save updated status
+    saveSession();
+    updateUserProfile();
+    renderTeamInfo();
 }
 
 // Handle Send Offer
 function handleSendOffer(team) {
     const t = translations[lang];
     
-    const notification = {
-        id: Date.now(),
-        message: lang === 'id' 
-            ? `${currentUser.teamName} mengirim tawaran scrim!`
-            : `${currentUser.teamName} sent you a scrim offer!`,
-        whatsapp: team.whatsapp,
-        email: team.email,
-        timestamp: new Date().toLocaleString()
-    };
-    notifications.push(notification);
-    updateNotificationBadge();
+    const title = lang === 'id' ? 'Tawaran Scrim' : 'Scrim Offer';
+    const message = lang === 'id' 
+        ? `${currentUser.teamName} mengirim tawaran scrim!`
+        : `${currentUser.teamName} sent you a scrim offer!`;
+    
+    addNotification(title, message, team.whatsapp, team.email);
     
     alert(lang === 'id'
         ? `Tawaran dikirim ke ${team.teamName} via WhatsApp (${team.whatsapp}) dan Email (${team.email})`
         : `Offer sent to ${team.teamName} via WhatsApp (${team.whatsapp}) and Email (${team.email})`
     );
-}
-
-// Update Notification Badge
-function updateNotificationBadge() {
-    const badge = document.getElementById('notifBadge');
-    const count = notifications.length;
-    
-    if (count > 0) {
-        badge.textContent = count;
-        badge.style.display = 'flex';
-    } else {
-        badge.style.display = 'none';
-    }
 }
 
 // Render Team Info
@@ -656,40 +882,44 @@ function renderTeamInfo() {
     const t = translations[lang];
     const content = document.getElementById('teamInfoContent');
     
+    if (!content) return;
+    
+    const logoSrc = currentUser.logo || `https://ui-avatars.com/api/?name=${encodeURIComponent(currentUser.teamName)}&background=eab308&color=1f2937&size=256`;
+    
     content.innerHTML = `
         <div>
-            ${currentUser.logo ? `<img src="${currentUser.logo}" class="team-logo-large">` : ''}
+            <img src="${logoSrc}" class="team-logo-large" alt="${currentUser.teamName}">
             <div class="info-section">
                 <div class="info-item">
                     <span class="info-label">${t.teamName}</span>
-                    <span class="info-value">${currentUser.teamName}</span>
+                    <span class="info-value">${currentUser.teamName || '-'}</span>
                 </div>
                 <div class="info-item">
                     <span class="info-label">${t.captainName}</span>
-                    <span class="info-value">${currentUser.captainName}</span>
+                    <span class="info-value">${currentUser.captainName || '-'}</span>
                 </div>
                 <div class="info-item">
                     <span class="info-label">${t.whatsapp}</span>
-                    <span class="info-value">${currentUser.whatsapp}</span>
+                    <span class="info-value">${currentUser.whatsapp || '-'}</span>
                 </div>
             </div>
         </div>
         <div class="info-section">
             <div class="info-item">
                 <span class="info-label">${t.email}</span>
-                <span class="info-value">${currentUser.email}</span>
+                <span class="info-value">${currentUser.email || '-'}</span>
             </div>
             <div class="info-item">
                 <span class="info-label">${t.country}</span>
-                <span class="info-value">${currentUser.country}</span>
+                <span class="info-value">${currentUser.country || '-'}</span>
             </div>
             <div class="info-item">
                 <span class="info-label">${t.province}</span>
-                <span class="info-value">${currentUser.province}</span>
+                <span class="info-value">${currentUser.province || '-'}</span>
             </div>
             <div class="info-item">
                 <span class="info-label">${t.status}</span>
-                <span class="info-value" style="color: ${currentUser.status === 'available' ? '#4ade80' : currentUser.status === 'searching' ? '#facc15' : '#f87171'}">${getStatusText(currentUser.status)}</span>
+                <span class="info-value" style="color: ${currentUser.status === 'available' ? '#4ade80' : currentUser.status === 'searching' ? '#facc15' : '#f87171'}">${getStatusText(currentUser.status || 'available')}</span>
             </div>
         </div>
     `;
@@ -763,7 +993,7 @@ function handleUploadResults(e) {
     screenshotPreviewData = null;
 }
 
-// Render Notifications
+// Render Notifications (for notifications page)
 function renderNotifications() {
     const notifsList = document.getElementById('notificationsList');
     

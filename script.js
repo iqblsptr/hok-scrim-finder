@@ -5,23 +5,38 @@ let currentUser = null;
 let teams = [];
 let notifications = [];
 let expandedTeam = null;
+let scrimResults = []; // New: Store scrim results
 
 // Session Storage Keys
 const SESSION_KEY = 'hok_session';
 const NOTIF_KEY = 'hok_notifications';
+const SCRIM_KEY = 'hok_scrim_results';
 
 // Initialize App
 document.addEventListener('DOMContentLoaded', () => {
     setupEventListeners();
-    restoreSession(); // Restore session on page load
+    restoreSession();
     updateLanguage();
+    createCSButton(); // Create Customer Service Button
 });
+
+// Create Customer Service Floating Button
+function createCSButton() {
+    const csButton = document.createElement('a');
+    csButton.href = 'https://wa.me/6281220792589?text=Halo,%20saya%20membutuhkan%20bantuan';
+    csButton.target = '_blank';
+    csButton.className = 'cs-float-button';
+    csButton.innerHTML = '<i class="fas fa-headset"></i>';
+    csButton.title = lang === 'id' ? 'Customer Service' : 'Customer Service';
+    document.body.appendChild(csButton);
+}
 
 // Restore Session from localStorage
 function restoreSession() {
     console.log('Restoring session...');
     const sessionData = localStorage.getItem(SESSION_KEY);
     const notifData = localStorage.getItem(NOTIF_KEY);
+    const scrimData = localStorage.getItem(SCRIM_KEY);
     
     if (sessionData) {
         try {
@@ -32,7 +47,6 @@ function restoreSession() {
             teams = session.teams || [];
             isLoggedIn = true;
             
-            // Show logged in UI
             showLoggedInUI();
             renderTeams();
             renderTeamInfo();
@@ -52,6 +66,15 @@ function restoreSession() {
             console.log('Notifications restored:', notifications.length);
         } catch (error) {
             console.error('Error restoring notifications:', error);
+        }
+    }
+    
+    if (scrimData) {
+        try {
+            scrimResults = JSON.parse(scrimData);
+            console.log('Scrim results restored:', scrimResults.length);
+        } catch (error) {
+            console.error('Error restoring scrim results:', error);
         }
     }
 }
@@ -81,6 +104,11 @@ function saveNotifications() {
     localStorage.setItem(NOTIF_KEY, JSON.stringify(notifications));
 }
 
+// Save Scrim Results
+function saveScrimResults() {
+    localStorage.setItem(SCRIM_KEY, JSON.stringify(scrimResults));
+}
+
 // Show Logged In UI
 function showLoggedInUI() {
     document.getElementById('heroSection').style.display = 'none';
@@ -106,16 +134,12 @@ function updateUserProfile() {
         userAvatar.src = currentUser.logo;
         userAvatar.style.display = 'block';
     } else {
-        // Use default avatar with team initial
         userAvatar.src = `https://ui-avatars.com/api/?name=${encodeURIComponent(currentUser.teamName || 'T')}&background=eab308&color=1f2937&size=128`;
     }
     
-    // Update status color
     const statusText = getStatusText(currentUser.status || 'available');
     userStatus.textContent = statusText;
     
-    // Update status dot color
-    const statusDot = userStatus.querySelector('::before');
     if (currentUser.status === 'searching') {
         userStatus.style.setProperty('--status-color', '#facc15');
     } else if (currentUser.status === 'inMatch') {
@@ -132,7 +156,6 @@ function setupEventListeners() {
     document.getElementById('btnReadAll').addEventListener('click', markAllNotificationsRead);
     document.getElementById('logoutBtn').addEventListener('click', logout);
     
-    // Close notification dropdown when clicking outside
     document.addEventListener('click', (e) => {
         const notifWrapper = document.querySelector('.notification-wrapper');
         const notifDropdown = document.getElementById('notificationDropdown');
@@ -219,9 +242,8 @@ function addNotification(title, message, whatsapp, email) {
         read: false
     };
     
-    notifications.unshift(notification); // Add to beginning
+    notifications.unshift(notification);
     
-    // Keep only last 50 notifications
     if (notifications.length > 50) {
         notifications = notifications.slice(0, 50);
     }
@@ -247,6 +269,12 @@ function updateNotificationBadge() {
 function toggleLanguage() {
     lang = lang === 'id' ? 'en' : 'id';
     updateLanguage();
+    
+    // Update CS button text
+    const csButton = document.querySelector('.cs-float-button');
+    if (csButton) {
+        csButton.title = lang === 'id' ? 'Customer Service' : 'Customer Service';
+    }
 }
 
 function updateLanguage() {
@@ -332,6 +360,17 @@ function openModal(type) {
         modalBody.innerHTML = getUploadResultsFormHTML();
         document.getElementById('screenshotUpload').addEventListener('change', handleScreenshotUpload);
         document.getElementById('resultsForm').addEventListener('submit', handleUploadResults);
+    } else if (type === 'editProfile') {
+        modalTitle.textContent = lang === 'id' ? 'Edit Profil Tim' : 'Edit Team Profile';
+        modalBody.innerHTML = getEditProfileFormHTML();
+        
+        const countrySelect = document.getElementById('editCountry');
+        countrySelect.addEventListener('change', () => updateEditProvinces());
+        document.getElementById('editLogoUpload').addEventListener('change', handleEditLogoUpload);
+        document.getElementById('editProfileForm').addEventListener('submit', handleEditProfile);
+        
+        // Populate current data
+        updateEditProvinces();
     }
     
     modal.style.display = 'flex';
@@ -416,10 +455,7 @@ async function handleLogin(e) {
             isLoggedIn = true;
             teams = result.allTeams || [];
             
-            // Save session
             saveSession();
-            
-            // Show UI
             showLoggedInUI();
             updateUserProfile();
             
@@ -648,6 +684,161 @@ async function handleRegister(e) {
     }
 }
 
+// Edit Profile Form HTML
+function getEditProfileFormHTML() {
+    const t = translations[lang];
+    
+    return `
+        <form id="editProfileForm" class="form-group" style="display: flex; flex-direction: column; gap: 1rem;">
+            <div class="form-group">
+                <label>${t.teamLogo}</label>
+                <input type="file" id="editLogoUpload" accept="image/*">
+                <img id="editLogoPreview" class="logo-preview" src="${currentUser.logo || ''}" style="${currentUser.logo ? 'display: block;' : 'display: none;'}">
+            </div>
+            
+            <div class="form-group">
+                <label>${t.teamName}</label>
+                <input type="text" id="editTeamName" value="${currentUser.teamName || ''}" required>
+            </div>
+            
+            <div class="form-group">
+                <label>${t.captainName}</label>
+                <input type="text" id="editCaptainName" value="${currentUser.captainName || ''}" required>
+            </div>
+            
+            <div class="form-group">
+                <label>${t.country}</label>
+                <select id="editCountry" required>
+                    <option value="">${t.selectCountry}</option>
+                    <option value="Indonesia" ${currentUser.country === 'Indonesia' ? 'selected' : ''}>${t.indonesia}</option>
+                    <option value="Malaysia" ${currentUser.country === 'Malaysia' ? 'selected' : ''}>${t.malaysia}</option>
+                    <option value="Philippines" ${currentUser.country === 'Philippines' ? 'selected' : ''}>${t.philippines}</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label>${t.province}</label>
+                <select id="editProvince" required>
+                    <option value="">${t.selectProvince}</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label>${t.whatsapp}</label>
+                <div class="phone-input-group">
+                    <span class="phone-prefix" id="editPhonePrefix">+62</span>
+                    <input type="tel" id="editWhatsapp" value="${currentUser.whatsapp ? currentUser.whatsapp.replace(/^\+\d+/, '') : ''}" placeholder="8123456789" required>
+                </div>
+                <div class="hint-text" id="editPhoneHint">Contoh: 8123456789 (tanpa +62)</div>
+            </div>
+            
+            <button type="submit" class="btn-submit">${lang === 'id' ? 'Simpan Perubahan' : 'Save Changes'}</button>
+        </form>
+    `;
+}
+
+// Update Edit Provinces
+function updateEditProvinces() {
+    const country = document.getElementById('editCountry').value;
+    const provinceSelect = document.getElementById('editProvince');
+    const phonePrefixEl = document.getElementById('editPhonePrefix');
+    const phoneHint = document.getElementById('editPhoneHint');
+    const whatsappInput = document.getElementById('editWhatsapp');
+    const t = translations[lang];
+    
+    provinceSelect.innerHTML = `<option value="">${t.selectProvince}</option>`;
+    provinceSelect.disabled = !country;
+    
+    if (country && regions[country]) {
+        regions[country].forEach(province => {
+            const option = document.createElement('option');
+            option.value = province;
+            option.textContent = province;
+            if (province === currentUser.province) {
+                option.selected = true;
+            }
+            provinceSelect.appendChild(option);
+        });
+    }
+    
+    if (country && phonePatterns[country]) {
+        const pattern = phonePatterns[country];
+        phonePrefixEl.textContent = pattern.prefix;
+        whatsappInput.placeholder = pattern.placeholder;
+        phoneHint.textContent = `Contoh: ${pattern.example}`;
+        whatsappInput.pattern = pattern.pattern.source;
+    }
+}
+
+// Handle Edit Logo Upload
+let editLogoBase64Data = null;
+
+function handleEditLogoUpload(e) {
+    const file = e.target.files[0];
+    if (file && file.size <= 10 * 1024 * 1024) {
+        const reader = new FileReader();
+        reader.onloadend = () => {
+            editLogoBase64Data = reader.result;
+            document.getElementById('editLogoPreview').src = reader.result;
+            document.getElementById('editLogoPreview').style.display = 'block';
+        };
+        reader.readAsDataURL(file);
+    } else {
+        alert(lang === 'id' ? 'Ukuran file maksimal 10MB' : 'Maximum file size is 10MB');
+        editLogoBase64Data = null;
+    }
+}
+
+// Handle Edit Profile
+function handleEditProfile(e) {
+    e.preventDefault();
+    const t = translations[lang];
+    
+    const country = document.getElementById('editCountry').value;
+    const whatsapp = document.getElementById('editWhatsapp').value;
+    
+    if (!country || !phonePatterns[country]) {
+        alert(lang === 'id' ? 'Pilih negara terlebih dahulu' : 'Please select a country');
+        return;
+    }
+    
+    const pattern = phonePatterns[country];
+    if (!pattern.pattern.test(whatsapp)) {
+        alert(lang === 'id' 
+            ? `Format WhatsApp tidak valid untuk ${country}. Contoh: ${pattern.example}`
+            : `Invalid WhatsApp format for ${country}. Example: ${pattern.example}`
+        );
+        return;
+    }
+    
+    const fullWhatsapp = pattern.prefix + whatsapp;
+    
+    // Update currentUser
+    currentUser.teamName = document.getElementById('editTeamName').value;
+    currentUser.captainName = document.getElementById('editCaptainName').value;
+    currentUser.country = country;
+    currentUser.province = document.getElementById('editProvince').value;
+    currentUser.whatsapp = fullWhatsapp;
+    
+    if (editLogoBase64Data) {
+        currentUser.logo = editLogoBase64Data;
+    }
+    
+    // Update in teams array
+    const teamIndex = teams.findIndex(t => t.id === currentUser.id);
+    if (teamIndex !== -1) {
+        teams[teamIndex] = {...teams[teamIndex], ...currentUser};
+    }
+    
+    saveSession();
+    updateUserProfile();
+    renderTeamInfo();
+    renderTeams();
+    
+    closeModal();
+    alert(lang === 'id' ? 'Profil berhasil diperbarui!' : 'Profile updated successfully!');
+}
+
 // Logout
 function logout() {
     const confirmLogout = confirm(lang === 'id' ? 'Yakin ingin keluar?' : 'Are you sure you want to logout?');
@@ -660,7 +851,6 @@ function logout() {
     notifications = [];
     expandedTeam = null;
     
-    // Clear session
     clearSession();
     
     document.getElementById('heroSection').style.display = 'block';
@@ -692,6 +882,22 @@ function updateProvinces() {
     }
 }
 
+// Get Team Scrim Stats
+function getTeamScrimStats(teamId) {
+    const teamResults = scrimResults.filter(r => r.teamId === teamId);
+    const wins = teamResults.filter(r => r.yourScore > r.opponentScore).length;
+    const losses = teamResults.filter(r => r.yourScore < r.opponentScore).length;
+    const draws = teamResults.filter(r => r.yourScore === r.opponentScore).length;
+    
+    return {
+        total: teamResults.length,
+        wins,
+        losses,
+        draws,
+        results: teamResults
+    };
+}
+
 // Render Teams
 function renderTeams() {
     const t = translations[lang];
@@ -705,7 +911,6 @@ function renderTeams() {
         return true;
     });
     
-    // Group by country
     const grouped = {};
     filteredTeams.forEach(team => {
         if (!grouped[team.country]) grouped[team.country] = [];
@@ -739,7 +944,6 @@ function renderTeams() {
     
     teamsList.innerHTML = html;
     
-    // Add event listeners
     document.querySelectorAll('.team-header').forEach(header => {
         header.addEventListener('click', (e) => {
             const teamCard = e.currentTarget.closest('.team-card');
@@ -763,6 +967,7 @@ function renderTeamCard(team) {
     const t = translations[lang];
     const isExpanded = expandedTeam === team.id;
     const statusClass = `status-${team.status}`;
+    const stats = getTeamScrimStats(team.id);
     
     return `
         <div class="team-card" data-team-id="${team.id}">
@@ -772,6 +977,7 @@ function renderTeamCard(team) {
                     <div class="team-header-info">
                         <div class="team-name">${team.teamName}</div>
                         <div class="team-province">${team.province}</div>
+                        ${stats.total > 0 ? `<div class="team-stats">${lang === 'id' ? 'Pertandingan' : 'Matches'}: ${stats.total} | ${lang === 'id' ? 'M' : 'W'}: ${stats.wins} ${lang === 'id' ? 'K' : 'L'}: ${stats.losses}</div>` : ''}
                     </div>
                 </div>
                 <div class="team-header-right">
@@ -800,6 +1006,19 @@ function renderTeamCard(team) {
                             <span class="detail-value">${team.email}</span>
                         </div>
                     </div>
+                    ${stats.total > 0 ? `
+                        <div class="scrim-history">
+                            <h4>${lang === 'id' ? 'Riwayat Scrim' : 'Scrim History'}</h4>
+                            <div class="scrim-history-list">
+                                ${stats.results.slice(0, 3).map(r => `
+                                    <div class="scrim-result-item">
+                                        <span>${r.opponent}</span>
+                                        <span class="scrim-score ${r.yourScore > r.opponentScore ? 'win' : r.yourScore < r.opponentScore ? 'loss' : 'draw'}">${r.yourScore} - ${r.opponentScore}</span>
+                                    </div>
+                                `).join('')}
+                            </div>
+                        </div>
+                    ` : ''}
                     <button class="btn-send-offer" ${team.status === 'inMatch' ? 'disabled' : ''}>${t.sendOffer}</button>
                 </div>
             ` : ''}
@@ -838,7 +1057,6 @@ function handleSearchMatch() {
         document.getElementById('searchBtn').innerHTML = `<i class="fas fa-times"></i><span>${t.cancelSearch}</span>`;
         document.getElementById('searchingIndicator').style.display = 'flex';
         
-        // Simulate finding a match after 3 seconds
         setTimeout(() => {
             const title = lang === 'id' ? 'Tim Tertarik' : 'Team Interested';
             const message = lang === 'id' ? 'Ada tim yang tertarik untuk scrim dengan Anda!' : 'A team is interested in scrimming with you!';
@@ -852,13 +1070,12 @@ function handleSearchMatch() {
         }, 3000);
     }
     
-    // Save updated status
     saveSession();
     updateUserProfile();
     renderTeamInfo();
 }
 
-// Handle Send Offer
+// Handle Send Offer - WITH AUTO WHATSAPP & EMAIL
 function handleSendOffer(team) {
     const t = translations[lang];
     
@@ -869,13 +1086,35 @@ function handleSendOffer(team) {
     
     addNotification(title, message, team.whatsapp, team.email);
     
-    alert(lang === 'id'
-        ? `Tawaran dikirim ke ${team.teamName} via WhatsApp (${team.whatsapp}) dan Email (${team.email})`
-        : `Offer sent to ${team.teamName} via WhatsApp (${team.whatsapp}) and Email (${team.email})`
+    // WhatsApp Message
+    const waMessage = lang === 'id'
+        ? `Halo ${team.teamName}! 👋\n\nSaya dari tim *${currentUser.teamName}* ingin mengajukan scrim dengan tim Anda.\n\n📋 Detail Tim Kami:\n- Kapten: ${currentUser.captainName}\n- Negara: ${currentUser.country}\n- Provinsi: ${currentUser.province}\n\n📞 Kontak:\n- WhatsApp: ${currentUser.whatsapp}\n- Email: ${currentUser.email}\n\nMohon konfirmasinya. Terima kasih! 🙏`
+        : `Hello ${team.teamName}! 👋\n\nI'm from team *${currentUser.teamName}* and would like to propose a scrim with your team.\n\n📋 Our Team Details:\n- Captain: ${currentUser.captainName}\n- Country: ${currentUser.country}\n- Province: ${currentUser.province}\n\n📞 Contact:\n- WhatsApp: ${currentUser.whatsapp}\n- Email: ${currentUser.email}\n\nPlease confirm. Thank you! 🙏`;
+    
+    const waUrl = `https://wa.me/${team.whatsapp.replace(/\D/g, '')}?text=${encodeURIComponent(waMessage)}`;
+    
+    // Email Message
+    const emailSubject = lang === 'id' ? 'Tawaran Scrim dari ' + currentUser.teamName : 'Scrim Offer from ' + currentUser.teamName;
+    const emailBody = lang === 'id'
+        ? `Halo ${team.teamName}!\n\nSaya dari tim ${currentUser.teamName} ingin mengajukan scrim dengan tim Anda.\n\nDetail Tim Kami:\n- Kapten: ${currentUser.captainName}\n- Negara: ${currentUser.country}\n- Provinsi: ${currentUser.province}\n\nKontak:\n- WhatsApp: ${currentUser.whatsapp}\n- Email: ${currentUser.email}\n\nMohon konfirmasinya. Terima kasih!`
+        : `Hello ${team.teamName}!\n\nI'm from team ${currentUser.teamName} and would like to propose a scrim with your team.\n\nOur Team Details:\n- Captain: ${currentUser.captainName}\n- Country: ${currentUser.country}\n- Province: ${currentUser.province}\n\nContact:\n- WhatsApp: ${currentUser.whatsapp}\n- Email: ${currentUser.email}\n\nPlease confirm. Thank you!`;
+    
+    const mailtoUrl = `mailto:${team.email}?subject=${encodeURIComponent(emailSubject)}&body=${encodeURIComponent(emailBody)}`;
+    
+    // Show options
+    const choice = confirm(lang === 'id'
+        ? `Tawaran akan dikirim ke ${team.teamName}!\n\nKlik OK untuk kirim via WhatsApp\nKlik Cancel untuk kirim via Email`
+        : `Offer will be sent to ${team.teamName}!\n\nClick OK to send via WhatsApp\nClick Cancel to send via Email`
     );
+    
+    if (choice) {
+        window.open(waUrl, '_blank');
+    } else {
+        window.open(mailtoUrl, '_blank');
+    }
 }
 
-// Render Team Info
+// Render Team Info - FIXED
 function renderTeamInfo() {
     if (!currentUser) return;
     
@@ -885,10 +1124,17 @@ function renderTeamInfo() {
     if (!content) return;
     
     const logoSrc = currentUser.logo || `https://ui-avatars.com/api/?name=${encodeURIComponent(currentUser.teamName)}&background=eab308&color=1f2937&size=256`;
+    const stats = getTeamScrimStats(currentUser.id);
     
     content.innerHTML = `
-        <div>
+        <div class="team-info-section">
             <img src="${logoSrc}" class="team-logo-large" alt="${currentUser.teamName}">
+            <button class="btn-edit-profile" onclick="openModal('editProfile')">
+                <i class="fas fa-edit"></i>
+                <span>${lang === 'id' ? 'Edit Profil' : 'Edit Profile'}</span>
+            </button>
+        </div>
+        <div class="team-info-section">
             <div class="info-section">
                 <div class="info-item">
                     <span class="info-label">${t.teamName}</span>
@@ -902,27 +1148,86 @@ function renderTeamInfo() {
                     <span class="info-label">${t.whatsapp}</span>
                     <span class="info-value">${currentUser.whatsapp || '-'}</span>
                 </div>
+                <div class="info-item">
+                    <span class="info-label">${t.email}</span>
+                    <span class="info-value">${currentUser.email || '-'}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">${t.country}</span>
+                    <span class="info-value">${currentUser.country || '-'}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">${t.province}</span>
+                    <span class="info-value">${currentUser.province || '-'}</span>
+                </div>
+                <div class="info-item">
+                    <span class="info-label">${t.status}</span>
+                    <span class="info-value" style="color: ${currentUser.status === 'available' ? '#4ade80' : currentUser.status === 'searching' ? '#facc15' : '#f87171'}">${getStatusText(currentUser.status || 'available')}</span>
+                </div>
             </div>
-        </div>
-        <div class="info-section">
-            <div class="info-item">
-                <span class="info-label">${t.email}</span>
-                <span class="info-value">${currentUser.email || '-'}</span>
-            </div>
-            <div class="info-item">
-                <span class="info-label">${t.country}</span>
-                <span class="info-value">${currentUser.country || '-'}</span>
-            </div>
-            <div class="info-item">
-                <span class="info-label">${t.province}</span>
-                <span class="info-value">${currentUser.province || '-'}</span>
-            </div>
-            <div class="info-item">
-                <span class="info-label">${t.status}</span>
-                <span class="info-value" style="color: ${currentUser.status === 'available' ? '#4ade80' : currentUser.status === 'searching' ? '#facc15' : '#f87171'}">${getStatusText(currentUser.status || 'available')}</span>
-            </div>
+            
+            ${stats.total > 0 ? `
+                <div class="info-section" style="margin-top: 1.5rem;">
+                    <h3 style="color: #fcd34d; margin-bottom: 1rem;">${lang === 'id' ? 'Statistik Scrim' : 'Scrim Statistics'}</h3>
+                    <div class="stats-grid">
+                        <div class="stat-item">
+                            <div class="stat-value">${stats.total}</div>
+                            <div class="stat-label">${lang === 'id' ? 'Total' : 'Total'}</div>
+                        </div>
+                        <div class="stat-item win">
+                            <div class="stat-value">${stats.wins}</div>
+                            <div class="stat-label">${lang === 'id' ? 'Menang' : 'Wins'}</div>
+                        </div>
+                        <div class="stat-item loss">
+                            <div class="stat-value">${stats.losses}</div>
+                            <div class="stat-label">${lang === 'id' ? 'Kalah' : 'Losses'}</div>
+                        </div>
+                        <div class="stat-item draw">
+                            <div class="stat-value">${stats.draws}</div>
+                            <div class="stat-label">${lang === 'id' ? 'Seri' : 'Draws'}</div>
+                        </div>
+                    </div>
+                    
+                    <h4 style="color: #93c5fd; margin: 1rem 0 0.5rem 0;">${lang === 'id' ? 'Riwayat Terakhir' : 'Recent History'}</h4>
+                    <div class="scrim-history-list">
+                        ${stats.results.slice(0, 5).map(r => `
+                            <div class="scrim-result-item-full">
+                                <div class="scrim-result-header">
+                                    <span class="scrim-opponent">${r.opponent}</span>
+                                    <span class="scrim-date">${new Date(r.timestamp).toLocaleDateString(lang === 'id' ? 'id-ID' : 'en-US')}</span>
+                                </div>
+                                <div class="scrim-result-score ${r.yourScore > r.opponentScore ? 'win' : r.yourScore < r.opponentScore ? 'loss' : 'draw'}">
+                                    ${r.yourScore} - ${r.opponentScore}
+                                    ${r.screenshot ? `<button class="btn-view-screenshot" onclick="viewScreenshot('${r.screenshot}')"><i class="fas fa-image"></i></button>` : ''}
+                                </div>
+                            </div>
+                        `).join('')}
+                    </div>
+                </div>
+            ` : ''}
         </div>
     `;
+}
+
+// View Screenshot
+function viewScreenshot(screenshot) {
+    const modal = document.createElement('div');
+    modal.className = 'screenshot-modal';
+    modal.innerHTML = `
+        <div class="screenshot-modal-content">
+            <button class="btn-close-screenshot" onclick="this.closest('.screenshot-modal').remove()">
+                <i class="fas fa-times"></i>
+            </button>
+            <img src="${screenshot}" alt="Screenshot">
+        </div>
+    `;
+    document.body.appendChild(modal);
+    
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+            modal.remove();
+        }
+    });
 }
 
 // Upload Results Form HTML
@@ -933,7 +1238,7 @@ function getUploadResultsFormHTML() {
         <form id="resultsForm" class="form-group" style="display: flex; flex-direction: column; gap: 1rem;">
             <div class="form-group">
                 <label>${t.opponent}</label>
-                <input type="text" id="opponentName" required>
+                <input type="text" id="opponentName" required placeholder="${lang === 'id' ? 'Nama tim lawan' : 'Opponent team name'}">
             </div>
             
             <div class="form-group-row">
@@ -949,7 +1254,7 @@ function getUploadResultsFormHTML() {
             
             <div class="form-group">
                 <label>${t.uploadScreenshot}</label>
-                <input type="file" id="screenshotUpload" accept="image/*">
+                <input type="file" id="screenshotUpload" accept="image/*" required>
                 <img id="screenshotPreview" style="max-width: 100%; max-height: 256px; margin-top: 0.5rem; border-radius: 0.5rem; display: none;">
             </div>
             
@@ -981,8 +1286,28 @@ function handleUploadResults(e) {
     const t = translations[lang];
     
     const opponent = document.getElementById('opponentName').value;
-    const yourScore = document.getElementById('yourScore').value;
-    const opponentScore = document.getElementById('opponentScore').value;
+    const yourScore = parseInt(document.getElementById('yourScore').value);
+    const opponentScore = parseInt(document.getElementById('opponentScore').value);
+    
+    if (!screenshotPreviewData) {
+        alert(lang === 'id' ? 'Screenshot wajib diupload!' : 'Screenshot is required!');
+        return;
+    }
+    
+    // Add to scrim results
+    const result = {
+        id: Date.now(),
+        teamId: currentUser.id,
+        teamName: currentUser.teamName,
+        opponent: opponent,
+        yourScore: yourScore,
+        opponentScore: opponentScore,
+        screenshot: screenshotPreviewData,
+        timestamp: new Date().toISOString()
+    };
+    
+    scrimResults.unshift(result);
+    saveScrimResults();
     
     alert(lang === 'id' 
         ? `Hasil pertandingan berhasil diupload!\nLawan: ${opponent}\nSkor: ${yourScore} - ${opponentScore}`
@@ -991,6 +1316,10 @@ function handleUploadResults(e) {
     
     closeModal();
     screenshotPreviewData = null;
+    
+    // Refresh display
+    renderTeamInfo();
+    renderTeams();
 }
 
 // Render Notifications (for notifications page)
@@ -1017,8 +1346,12 @@ function handleForgotPassword(e) {
     const t = translations[lang];
     
     const message = lang === 'id' 
-        ? "Fitur reset kata sandi otomatis tidak tersedia. Silakan hubungi admin kami melalui email: support@hokscrim.com"
-        : "Automatic password reset is unavailable. Please contact our admin via email: support@hokscrim.com";
+        ? "Fitur reset kata sandi otomatis tidak tersedia. Silakan hubungi admin kami melalui WhatsApp: +6281220792589"
+        : "Automatic password reset is unavailable. Please contact our admin via WhatsApp: +6281220792589";
         
-    alert(message);
+    const confirm = window.confirm(message + '\n\n' + (lang === 'id' ? 'Hubungi sekarang?' : 'Contact now?'));
+    
+    if (confirm) {
+        window.open('https://wa.me/6281220792589?text=Halo,%20saya%20lupa%20password%20akun%20saya', '_blank');
+    }
 }
